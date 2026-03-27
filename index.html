@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Data Center 監控系統</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #111827;
+    --bg-card: #1a2235;
+    --bg-card-hover: #1e2a42;
+    --border: #2a3a5c;
+    --border-bright: #3a5080;
+    --text-primary: #e2e8f0;
+    --text-secondary: #8a9bb8;
+    --text-muted: #4a5a78;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-yellow: #f59e0b;
+    --accent-orange: #f97316;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --glow-blue: rgba(59,130,246,0.2);
+    --glow-red: rgba(239,68,68,0.2);
+    --glow-green: rgba(16,185,129,0.2);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ===== NAV ===== */
+  .topnav {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 32px;
+  }
+  .nav-logo .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .nav-logo span {
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+  }
+  .nav-logo small {
+    font-size: 10px;
+    color: var(--text-secondary);
+    display: block;
+    line-height: 1;
+  }
+  .nav-tabs {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+  }
+  .nav-tab {
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border: none;
+    background: transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .nav-tab:hover { background: var(--bg-card); color: var(--text-primary); }
+  .nav-tab.active {
+    background: var(--glow-blue);
+    color: var(--accent-blue);
+    border: 1px solid rgba(59,130,246,0.3);
+  }
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; }
+    50% { opacity:0.5; }
+  }
+  .nav-time { font-size: 12px; color: var(--text-secondary); }
+
+  /* ===== PAGES ===== */
+  .page { display: none; padding: 20px 24px; }
+  .page.active { display: block; }
+
+  /* ===== GRID LAYOUTS ===== */
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 20px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .grid-main { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .grid-detail { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--border-bright); }
+  .card-title {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  /* ===== KPI CARDS ===== */
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi-card.blue::before { background: var(--accent-blue); }
+  .kpi-card.green::before { background: var(--accent-green); }
+  .kpi-card.yellow::before { background: var(--accent-yellow); }
+  .kpi-card.red::before { background: var(--accent-red); }
+  .kpi-card.purple::before { background: var(--accent-purple); }
+  .kpi-card.cyan::before { background: var(--accent-cyan); }
+  .kpi-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+  .kpi-value.blue { color: var(--accent-blue); }
+  .kpi-value.green { color: var(--accent-green); }
+  .kpi-value.yellow { color: var(--accent-yellow); }
+  .kpi-value.red { color: var(--accent-red); }
+  .kpi-value.purple { color: var(--accent-purple); }
+  .kpi-value.cyan { color: var(--accent-cyan); }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); }
+  .kpi-icon {
+    position: absolute;
+    right: 16px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 36px;
+    opacity: 0.08;
+  }
+  .kpi-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+  .kpi-trend.up { background: var(--glow-red); color: var(--accent-red); }
+  .kpi-trend.down { background: var(--glow-green); color: var(--accent-green); }
+  .kpi-trend.stable { background: rgba(248,197,11,0.1); color: var(--accent-yellow); }
+
+  /* ===== HEATMAP ===== */
+  .heatmap-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .heatmap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+  }
+  .heatmap-cell {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .heatmap-cell:hover {
+    transform: scale(1.08);
+    z-index: 10;
+    border-color: rgba(255,255,255,0.3);
+  }
+  .heatmap-cell .cell-id { font-size: 9px; opacity: 0.8; }
+  .heatmap-cell .cell-temp { font-size: 12px; font-weight: 700; }
+  .heatmap-cell.cool { background: rgba(6,182,212,0.25); color: var(--accent-cyan); }
+  .heatmap-cell.normal { background: rgba(16,185,129,0.25); color: var(--accent-green); }
+  .heatmap-cell.warm { background: rgba(245,158,11,0.25); color: var(--accent-yellow); }
+  .heatmap-cell.hot { background: rgba(249,115,22,0.35); color: var(--accent-orange); }
+  .heatmap-cell.critical {
+    background: rgba(239,68,68,0.35);
+    color: var(--accent-red);
+    animation: blink 1.5s infinite;
+  }
+  .heatmap-cell.selected {
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.4);
+  }
+  @keyframes blink {
+    0%,100% { background: rgba(239,68,68,0.35); }
+    50% { background: rgba(239,68,68,0.6); }
+  }
+  .heatmap-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+  }
+
+  /* ===== ALERTS ===== */
+  .alert-list { display: flex; flex-direction: column; gap: 8px; }
+  .alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .alert-item:hover { border-color: var(--border-bright); background: var(--bg-card-hover); }
+  .alert-severity {
+    width: 6px;
+    min-width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 4px;
+  }
+  .alert-severity.critical { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+  .alert-severity.warning { background: var(--accent-yellow); box-shadow: 0 0 6px var(--accent-yellow); }
+  .alert-severity.info { background: var(--accent-blue); box-shadow: 0 0 6px var(--accent-blue); }
+  .alert-content { flex: 1; min-width: 0; }
+  .alert-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .alert-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .alert-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .alert-badge.critical { background: var(--glow-red); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+  .alert-badge.warning { background: rgba(245,158,11,0.1); color: var(--accent-yellow); border: 1px solid rgba(245,158,11,0.3); }
+  .alert-badge.info { background: var(--glow-blue); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); }
+  .alert-action-btn {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .alert-action-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: var(--glow-blue); }
+
+  /* ===== PAGE 2 DETAIL ===== */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+  .breadcrumb a {
+    color: var(--accent-blue);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .breadcrumb a:hover { text-decoration: underline; }
+  .breadcrumb .sep { color: var(--text-muted); }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .detail-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .container-badge {
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(6,182,212,0.2));
+    border: 1px solid rgba(59,130,246,0.4);
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    letter-spacing: 1px;
+  }
+  .detail-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--accent-red);
+    background: var(--glow-red);
+    border: 1px solid rgba(239,68,68,0.3);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    animation: blink 1.5s infinite;
+  }
+  .detail-actions { display: flex; gap: 8px; }
+  .btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: var(--accent-blue);
+    color: white;
+  }
+  .btn-primary:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
+  .btn-outline {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover { border-color: var(--border-bright); color: var(--text-primary); }
+  .btn-danger {
+    background: transparent;
+    color: var(--accent-red);
+    border: 1px solid rgba(239,68,68,0.4);
+  }
+  .btn-danger:hover { background: var(--glow-red); }
+
+  /* ===== CHART ===== */
+  .chart-wrapper {
+    position: relative;
+    height: 220px;
+  }
+
+  /* ===== EQUIPMENT TABLE ===== */
+  .equip-table { width: 100%; border-collapse: collapse; }
+  .equip-table tr { border-bottom: 1px solid var(--border); }
+  .equip-table tr:last-child { border-bottom: none; }
+  .equip-table td {
+    padding: 9px 4px;
+    font-size: 13px;
+  }
+  .equip-table td:first-child { color: var(--text-secondary); width: 45%; }
+  .equip-table td:last-child { color: var(--text-primary); font-weight: 500; }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .status-badge.ok { background: var(--glow-green); color: var(--accent-green); }
+  .status-badge.warn { background: rgba(245,158,11,0.1); color: var(--accent-yellow); }
+  .status-badge.err { background: var(--glow-red); color: var(--accent-red); }
+
+  /* ===== EVENT LOG ===== */
+  .event-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .event-list::-webkit-scrollbar { width: 4px; }
+  .event-list::-webkit-scrollbar-track { background: transparent; }
+  .event-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .event-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    font-size: 12px;
+  }
+  .event-time { color: var(--text-muted); white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .event-dot {
+    width: 6px; min-width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .event-dot.red { background: var(--accent-red); }
+  .event-dot.yellow { background: var(--accent-yellow); }
+  .event-dot.blue { background: var(--accent-blue); }
+  .event-dot.green { background: var(--accent-green); }
+  .event-msg { color: var(--text-primary); flex: 1; }
+
+  /* ===== METRICS MINI ===== */
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { font-size: 12px; color: var(--text-secondary); }
+  .metric-val { font-size: 14px; font-weight: 600; }
+  .metric-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .metric-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s;
+  }
+
+  /* ===== MODAL ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-bright);
+    border-radius: 16px;
+    width: 520px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.25s ease;
+    position: relative;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .modal-close {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s;
+  }
+  .modal-close:hover { background: var(--bg-card); color: var(--text-primary); }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* ===== FORM ===== */
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-input, .form-select, .form-textarea {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+  .form-textarea { height: 80px; resize: vertical; }
+  .form-select option { background: var(--bg-card); }
+  .form-info-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .info-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .info-box-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .info-box-value { font-size: 13px; font-weight: 500; }
+
+  /* Priority buttons */
+  .priority-group { display: flex; gap: 8px; }
+  .priority-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    text-align: center;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .priority-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
+  .priority-btn.selected-low { border-color: var(--accent-green); background: var(--glow-green); color: var(--accent-green); }
+  .priority-btn.selected-medium { border-color: var(--accent-yellow); background: rgba(245,158,11,0.1); color: var(--accent-yellow); }
+  .priority-btn.selected-high { border-color: var(--accent-orange); background: rgba(249,115,22,0.1); color: var(--accent-orange); }
+  .priority-btn.selected-critical { border-color: var(--accent-red); background: var(--glow-red); color: var(--accent-red); }
+
+  /* ===== SUCCESS SCREEN ===== */
+  .success-screen {
+    display: none;
+    text-align: center;
+    padding: 40px 24px;
+  }
+  .success-screen.active { display: block; }
+  .success-icon {
+    width: 72px; height: 72px;
+    background: var(--glow-green);
+    border: 2px solid var(--accent-green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    margin: 0 auto 20px;
+    animation: successPop 0.4s ease;
+  }
+  @keyframes successPop {
+    0% { transform: scale(0); opacity: 0; }
+    70% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .success-title { font-size: 20px; font-weight: 700; color: var(--accent-green); margin-bottom: 8px; }
+  .success-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+  .success-ticket {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-align: left;
+    margin-bottom: 20px;
+  }
+  .success-ticket-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+  .success-ticket-row span:first-child { color: var(--text-secondary); }
+
+  /* ===== SECTION HEADER ===== */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+
+  /* ===== TOOLTIP ===== */
+  .tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e2a42;
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .heatmap-cell:hover .tooltip { opacity: 1; }
+  .tooltip-row { display: flex; gap: 8px; justify-content: space-between; }
+  .tooltip-row span:first-child { color: var(--text-secondary); }
+  .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--border-bright);
+  }
+
+  /* ===== MINI SPARKLINE ===== */
+  .spark { display: inline-block; }
+
+  /* ===== CONTAINER GRID ===== */
+  .container-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .container-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .container-card:hover { border-color: var(--border-bright); background: var(--bg-card-hover); transform: translateY(-1px); }
+  .container-card.critical-card { border-color: rgba(239,68,68,0.6); box-shadow: 0 0 12px rgba(239,68,68,0.15); }
+  .container-card-id { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+  .container-card-temp { font-size: 22px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+  .container-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .container-card-power { font-size: 11px; color: var(--text-muted); }
+
+  /* ===== TICKET TABLE ===== */
+  .ticket-filter-bar { display: flex; gap: 6px; margin-bottom: 16px; }
+  .filter-tab {
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
+    font-family: inherit; transition: all 0.2s;
+  }
+  .filter-tab:hover { border-color: var(--border-bright); color: var(--text-primary); }
+  .filter-tab.active { background: var(--glow-blue); color: var(--accent-blue); border-color: rgba(59,130,246,0.4); }
+  .ticket-table { width: 100%; border-collapse: collapse; }
+  .ticket-table th { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  .ticket-table td { font-size: 13px; padding: 12px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .ticket-table tr:last-child td { border-bottom: none; }
+  .ticket-table tr:hover td { background: var(--bg-card-hover); }
+  .ticket-id { color: var(--accent-blue); font-weight: 600; font-size: 12px; }
+  .ticket-desc { color: var(--text-primary); max-width: 220px; }
+  .ticket-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .badge-pending { background: rgba(245,158,11,0.12); color: var(--accent-yellow); border: 1px solid rgba(245,158,11,0.3); padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-inprogress { background: var(--glow-blue); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-done { background: var(--glow-green); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 900px) {
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+    .grid-main { grid-template-columns: 1fr; }
+    .grid-detail { grid-template-columns: 1fr; }
+    .heatmap-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="nav-logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <span>DCMS Pro</span>
+      <small>Data Center Monitor</small>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('overview')">📊 總覽儀表板</button>
+    <button class="nav-tab" onclick="showPage('containers')" id="tab-containers">🖥️ 容器管理</button>
+    <button class="nav-tab" onclick="showPage('power')">⚡ 電力監控</button>
+<button class="nav-tab" onclick="showPage('env')">🌡️ 環境監控</button>
+<button class="nav-tab" onclick="showPage('aiops')">🤖 AIOps 預測</button>
+    <button class="nav-tab" onclick="showPage('tickets')">🔧 工單管理</button>
+  </div>
+  <div class="nav-right">
+    <div class="status-dot"></div>
+    <span class="nav-time" id="clock">--:--:--</span>
+  </div>
+</nav>
+
+<!-- ==================== PAGE 1: OVERVIEW ==================== -->
+<div class="page active" id="page-overview">
+
+  <!-- KPI Row -->
+  <div class="grid-3" style="grid-template-columns: repeat(6,1fr)">
+    <div class="kpi-card blue">
+      <div class="kpi-label">運行容器</div>
+      <div class="kpi-value blue">32</div>
+      <div class="kpi-sub">共 32 個容器</div>
+      <div class="kpi-trend stable">● 全線上</div>
+      <div class="kpi-icon">🖥️</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">告警數</div>
+      <div class="kpi-value red" id="kpi-alerts">7</div>
+      <div class="kpi-sub">需要關注</div>
+      <div class="kpi-trend up">▲ +3 vs 昨日</div>
+      <div class="kpi-icon">🚨</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">平均溫度</div>
+      <div class="kpi-value yellow">34.2°C</div>
+      <div class="kpi-sub">正常範圍 < 40°C</div>
+      <div class="kpi-trend up">▲ +1.8°C</div>
+      <div class="kpi-icon">🌡️</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">整體 PUE</div>
+      <div class="kpi-value green">1.32</div>
+      <div class="kpi-sub">目標 < 1.40</div>
+      <div class="kpi-trend down">▼ -0.02</div>
+      <div class="kpi-icon">⚡</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">總功耗</div>
+      <div class="kpi-value purple">4.8MW</div>
+      <div class="kpi-sub">容量 6.0MW</div>
+      <div class="kpi-trend stable">● 80% 使用率</div>
+      <div class="kpi-icon">🔋</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-label">冷卻效率</div>
+      <div class="kpi-value cyan">94%</div>
+      <div class="kpi-sub">7 組冷卻系統</div>
+      <div class="kpi-trend down">▼ 良好</div>
+      <div class="kpi-icon">❄️</div>
+    </div>
+  </div>
+
+  <!-- Heatmap + Alerts -->
+  <div class="grid-main">
+    <!-- Heatmap -->
+    <div class="heatmap-container">
+      <div class="heatmap-header">
+        <div class="section-title">🗺️ 機房熱力圖</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:var(--text-muted)">點擊容器查看詳情</span>
+          <button class="btn btn-outline" style="font-size:11px;padding:5px 10px;" onclick="refreshHeatmap()">↻ 刷新</button>
+        </div>
+      </div>
+      <div class="heatmap-grid" id="heatmapGrid"></div>
+      <div class="heatmap-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(6,182,212,0.5)"></div>< 25°C 冷卻</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(16,185,129,0.5)"></div>25-32°C 正常</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.5)"></div>32-38°C 偏高</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.5)"></div>38-45°C 過熱</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,0.5)"></div>> 45°C 危急</div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="card">
+      <div class="card-title"><div class="dot" style="background:var(--accent-red)"></div>即時告警</div>
+      <div class="alert-list" id="alertList"></div>
+    </div>
+  </div>
+
+  <!-- System Summary Row -->
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title"><div class="dot" style="background:var(--accent-blue)"></div>網路流量 (Gbps)</div>
+      <div class="chart-wrapper"><canvas id="networkChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><div class="dot" style="background:var(--accent-green)"></div>功耗趨勢 (MW)</div>
+      <div class="chart-wrapper"><canvas id="powerChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><div class="dot" style="background:var(--accent-yellow)"></div>溫度分佈</div>
+      <div class="chart-wrapper"><canvas id="tempDistChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE: CONTAINERS ==================== -->
+<div class="page" id="page-containers">
+  <div class="section-header" style="margin-bottom:16px">
+    <div class="section-title">🖥️ 容器管理</div>
+    <span style="font-size:12px;color:var(--text-muted)">共 32 個容器</span>
+  </div>
+  <div class="container-grid" id="containerGrid"></div>
+</div>
+
+<!-- ==================== PAGE: CONTAINER DETAIL ==================== -->
+<div class="page" id="page-detail">
+  <div class="breadcrumb">
+    <a onclick="showPage('containers')">容器管理</a>
+    <span class="sep">›</span>
+    <span style="color:var(--text-primary)" id="detail-breadcrumb-id">C-07</span>
+  </div>
+
+  <div class="detail-header">
+    <div class="detail-title">
+      <div class="container-badge" id="detail-badge">C-07</div>
+      <div>
+        <div style="font-size:17px;font-weight:700">AI 運算容器 · 第三排第三列</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">GPU Cluster · Zone A · Rack 3-3</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="detail-status">🔴 高溫警告 47.3°C</div>
+      <div class="detail-actions">
+        <button class="btn btn-outline" onclick="showPage('containers')">← 返回</button>
+        <button class="btn btn-primary" onclick="openModal()">🔧 建立工單</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top KPIs -->
+  <div class="grid-3" style="grid-template-columns: repeat(5,1fr);margin-bottom:16px">
+    <div class="kpi-card red">
+      <div class="kpi-label">當前溫度</div>
+      <div class="kpi-value red">47.3°C</div>
+      <div class="kpi-sub">閾值 45°C</div>
+      <div class="kpi-icon">🌡️</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">GPU 使用率</div>
+      <div class="kpi-value yellow">94%</div>
+      <div class="kpi-sub">8x A100 80GB</div>
+      <div class="kpi-icon">🎮</div>
+    </div>
+    <div class="kpi-card orange" style="--accent-orange:#f97316">
+      <div class="kpi-label">功耗</div>
+      <div class="kpi-value" style="color:var(--accent-orange)">12.4kW</div>
+      <div class="kpi-sub">額定 15kW</div>
+      <div class="kpi-icon">⚡</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">記憶體使用</div>
+      <div class="kpi-value blue">87%</div>
+      <div class="kpi-sub">560 / 640 GB</div>
+      <div class="kpi-icon">💾</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">運行時間</div>
+      <div class="kpi-value green">14d</div>
+      <div class="kpi-sub">3h 42m</div>
+      <div class="kpi-icon">⏱️</div>
+    </div>
+  </div>
+
+  <div class="grid-detail">
+    <div>
+      <!-- Temperature Chart -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title"><div class="dot" style="background:var(--accent-red)"></div>溫度趨勢 (過去 24 小時)</div>
+        <div class="chart-wrapper" style="height:260px"><canvas id="tempTrendChart"></canvas></div>
+      </div>
+
+      <!-- Resource Charts -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><div class="dot" style="background:var(--accent-yellow)"></div>GPU 負載趨勢</div>
+          <div class="chart-wrapper"><canvas id="gpuChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><div class="dot" style="background:var(--accent-blue)"></div>記憶體使用趨勢</div>
+          <div class="chart-wrapper"><canvas id="memChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Event Log -->
+      <div class="card" style="margin-top:16px">
+        <div class="section-header">
+          <div class="card-title" style="margin:0"><div class="dot" style="background:var(--accent-purple)"></div>事件紀錄</div>
+          <button class="btn btn-outline" style="font-size:11px;padding:5px 10px;">全部匯出</button>
+        </div>
+        <div class="event-list" id="eventList"></div>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div>
+      <!-- Equipment Info -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title"><div class="dot" style="background:var(--accent-cyan)"></div>設備資訊</div>
+        <table class="equip-table">
+          <tr><td>容器 ID</td><td>C-07</td></tr>
+          <tr><td>位置</td><td>Zone A · R3-3</td></tr>
+          <tr><td>GPU 型號</td><td>NVIDIA A100 × 8</td></tr>
+          <tr><td>CPU</td><td>AMD EPYC 7763 × 2</td></tr>
+          <tr><td>記憶體</td><td>2TB DDR5 ECC</td></tr>
+          <tr><td>儲存</td><td>50TB NVMe RAID</td></tr>
+          <tr><td>網路</td><td>200GbE InfiniBand</td></tr>
+          <tr><td>冷卻方式</td><td>液冷 + 空冷</td></tr>
+          <tr><td>冷卻狀態</td><td><span class="status-badge warn">⚠ 風扇異常</span></td></tr>
+          <tr><td>電源</td><td><span class="status-badge ok">✓ 正常</span></td></tr>
+          <tr><td>網路狀態</td><td><span class="status-badge ok">✓ 正常</span></td></tr>
+          <tr><td>韌體版本</td><td>v2.4.1 (最新)</td></tr>
+          <tr><td>上次維護</td><td>2024-01-15</td></tr>
+          <tr><td>負責工程師</td><td>張偉 / 李明</td></tr>
+        </table>
+      </div>
+
+      <!-- Live Metrics -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title"><div class="dot" style="background:var(--accent-green)"></div>即時指標</div>
+        <div class="metric-row">
+          <div>
+            <div class="metric-label">進氣溫度</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:60%;background:var(--accent-green)"></div></div>
+          </div>
+          <div class="metric-val" style="color:var(--accent-green)">22.4°C</div>
+        </div>
+        <div class="metric-row">
+          <div>
+            <div class="metric-label">排氣溫度</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:95%;background:var(--accent-red)"></div></div>
+          </div>
+          <div class="metric-val" style="color:var(--accent-red)">47.3°C</div>
+        </div>
+        <div class="metric-row">
+          <div>
+            <div class="metric-label">風扇轉速</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:45%;background:var(--accent-yellow)"></div></div>
+          </div>
+          <div class="metric-val" style="color:var(--accent-yellow)">2,100 RPM</div>
+        </div>
+        <div class="metric-row">
+          <div>
+            <div class="metric-label">GPU 溫度</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:88%;background:var(--accent-orange)"></div></div>
+          </div>
+          <div class="metric-val" style="color:var(--accent-orange)">83°C</div>
+        </div>
+        <div class="metric-row">
+          <div>
+            <div class="metric-label">CPU 溫度</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:72%;background:var(--accent-yellow)"></div></div>
+          </div>
+          <div class="metric-val" style="color:var(--accent-yellow)">68°C</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <div class="card-title"><div class="dot" style="background:var(--accent-purple)"></div>快速操作</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-primary" onclick="openModal()" style="width:100%;justify-content:center">🔧 建立維修工單</button>
+          <button class="btn btn-outline" style="width:100%;justify-content:center">❄️ 提升冷卻功率</button>
+          <button class="btn btn-outline" style="width:100%;justify-content:center">📉 降低 GPU 負載</button>
+          <button class="btn btn-outline" style="width:100%;justify-content:center">📋 匯出診斷報告</button>
+          <button class="btn btn-danger" style="width:100%;justify-content:center">⚠️ 緊急關機</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PAGE: TICKETS ==================== -->
+<div class="page" id="page-tickets">
+  <div class="section-header" style="margin-bottom:16px">
+    <div class="section-title">🔧 工單管理</div>
+    <button class="btn btn-primary" onclick="openModal()">🔧 建立工單 +</button>
+  </div>
+  <div class="ticket-filter-bar">
+    <button class="filter-tab active" onclick="filterTickets('all',this)">全部</button>
+    <button class="filter-tab" onclick="filterTickets('pending',this)">待處理</button>
+    <button class="filter-tab" onclick="filterTickets('inprogress',this)">處理中</button>
+    <button class="filter-tab" onclick="filterTickets('done',this)">已完成</button>
+  </div>
+  <div class="card">
+    <table class="ticket-table">
+      <thead>
+        <tr>
+          <th>工單編號</th>
+          <th>容器</th>
+          <th>問題描述</th>
+          <th>指派工程師</th>
+          <th>狀態</th>
+          <th>建立時間</th>
+        </tr>
+      </thead>
+      <tbody id="ticketTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ==================== MODAL: 建立工單 ==================== -->
+<div class="modal-overlay" id="workorderModal">
+  <div class="modal">
+    <div id="modalFormView">
+      <div class="modal-header">
+        <div class="modal-title">🔧 建立維修工單</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- Auto-filled info -->
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-secondary)">
+          ⚡ 以下資訊已從告警系統自動帶入
+        </div>
+        <div class="form-info-row" style="margin-bottom:16px">
+          <div class="info-box">
+            <div class="info-box-label">容器</div>
+            <div class="info-box-value" style="color:var(--accent-blue)">C-07</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box-label">位置</div>
+            <div class="info-box-value">Zone A · Rack 3-3</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box-label">告警類型</div>
+            <div class="info-box-value" style="color:var(--accent-red)">高溫警告</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box-label">當前溫度</div>
+            <div class="info-box-value" style="color:var(--accent-red)">47.3°C</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">工單標題</label>
+          <input class="form-input" type="text" value="C-07 容器高溫異常 - 冷卻系統風扇故障" id="ticketTitle">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">優先級</label>
+          <div class="priority-group">
+            <button class="priority-btn" onclick="selectPriority('low')">🟢 低</button>
+            <button class="priority-btn" onclick="selectPriority('medium')">🟡 中</button>
+            <button class="priority-btn" onclick="selectPriority('high')">🟠 高</button>
+            <button class="priority-btn selected-critical" onclick="selectPriority('critical')" id="priority-critical">🔴 緊急</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">問題描述</label>
+          <textarea class="form-textarea" id="ticketDesc">容器 C-07 排氣溫度持續上升，目前達 47.3°C（超出閾值 45°C）。冷卻系統風扇轉速異常偏低（2,100 RPM），疑似風扇故障導致散熱不足。GPU 工作溫度已達 83°C，需立即介入處理。</textarea>
+        </div>
+
+        <div class="form-info-row">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">指派工程師</label>
+            <select class="form-select" id="assignee">
+              <option value="zhang">張偉（硬體維護）</option>
+              <option value="li">李明（冷卻系統）</option>
+              <option value="wang">王芳（GPU 專員）</option>
+              <option value="chen">陳建（電氣系統）</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">預計完成時間</label>
+            <input class="form-input" type="datetime-local" id="dueDate">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:16px">
+          <label class="form-label">附加標籤</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+            <span style="background:var(--glow-red);color:var(--accent-red);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:3px 10px;font-size:11px">高溫</span>
+            <span style="background:var(--glow-blue);color:var(--accent-blue);border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:3px 10px;font-size:11px">冷卻系統</span>
+            <span style="background:rgba(245,158,11,0.1);color:var(--accent-yellow);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:3px 10px;font-size:11px">風扇故障</span>
+            <span style="background:var(--glow-green);color:var(--accent-green);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:3px 10px;font-size:11px">GPU叢集</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal()">取消</button>
+        <button class="btn btn-outline" style="color:var(--accent-yellow);border-color:rgba(245,158,11,0.3)">💾 儲存草稿</button>
+        <button class="btn btn-primary" onclick="submitTicket()">📤 確認送出</button>
+      </div>
+    </div>
+
+    <!-- Success Screen -->
+    <div class="success-screen" id="modalSuccessView">
+      <div class="success-icon">✓</div>
+      <div class="success-title">工單建立成功！</div>
+      <div class="success-sub">系統已自動通知指派工程師，並同步至工單追蹤系統</div>
+      <div class="success-ticket">
+        <div class="success-ticket-row">
+          <span>工單編號</span>
+          <span style="color:var(--accent-blue);font-weight:600" id="ticketNum">#WO-2024-0847</span>
+        </div>
+        <div class="success-ticket-row">
+          <span>容器</span>
+          <span>C-07 / Zone A Rack 3-3</span>
+        </div>
+        <div class="success-ticket-row">
+          <span>優先級</span>
+          <span style="color:var(--accent-red)">🔴 緊急</span>
+        </div>
+        <div class="success-ticket-row">
+          <span>指派工程師</span>
+          <span id="assigneeName">李明（冷卻系統）</span>
+        </div>
+        <div class="success-ticket-row">
+          <span>預計完成</span>
+          <span id="dueDateDisplay">—</span>
+        </div>
+        <div class="success-ticket-row">
+          <span>狀態</span>
+          <span style="color:var(--accent-yellow)">🟡 待處理</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button class="btn btn-outline" onclick="closeModal()">關閉</button>
+        <button class="btn btn-primary" onclick="closeModal();showPage('overview')">返回儀表板</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('zh-TW', {hour12: false});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== PAGE SWITCHING =====
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const target = document.getElementById('page-' + id);
+  if (target) target.classList.add('active');
+  const tabMap = {overview:0, containers:1, detail:1, power:2, env:3, aiops:4, tickets:5};
+  const tabIdx = tabMap[id];
+  if (tabIdx !== undefined) {
+    const tabs = document.querySelectorAll('.nav-tab');
+    if (tabs[tabIdx]) tabs[tabIdx].classList.add('active');
+  }
+  if (id === 'detail' && !window.detailChartsInit) {
+    initDetailCharts();
+    window.detailChartsInit = true;
+  }
+}
+
+function showContainerDetail(id) {
+  document.getElementById('detail-breadcrumb-id').textContent = id;
+  document.getElementById('detail-badge').textContent = id;
+  showPage('detail');
+}
+
+// ===== HEATMAP DATA =====
+const cells = [
+  {id:'C-01', temp:22, status:'cool'}, {id:'C-02', temp:28, status:'normal'},
+  {id:'C-03', temp:31, status:'normal'}, {id:'C-04', temp:35, status:'warm'},
+  {id:'C-05', temp:29, status:'normal'}, {id:'C-06', temp:33, status:'warm'},
+  {id:'C-07', temp:47, status:'critical'}, {id:'C-08', temp:26, status:'normal'},
+  {id:'C-09', temp:38, status:'warm'}, {id:'C-10', temp:42, status:'hot'},
+  {id:'C-11', temp:31, status:'normal'}, {id:'C-12', temp:27, status:'normal'},
+  {id:'C-13', temp:36, status:'warm'}, {id:'C-14', temp:24, status:'cool'},
+  {id:'C-15', temp:29, status:'normal'}, {id:'C-16', temp:41, status:'hot'},
+  {id:'C-17', temp:33, status:'warm'}, {id:'C-18', temp:28, status:'normal'},
+  {id:'C-19', temp:22, status:'cool'}, {id:'C-20', temp:37, status:'warm'},
+  {id:'C-21', temp:44, status:'hot'}, {id:'C-22', temp:31, status:'normal'},
+  {id:'C-23', temp:26, status:'normal'}, {id:'C-24', temp:34, status:'warm'},
+  {id:'C-25', temp:29, status:'normal'}, {id:'C-26', temp:40, status:'hot'},
+  {id:'C-27', temp:23, status:'cool'}, {id:'C-28', temp:32, status:'warm'},
+  {id:'C-29', temp:27, status:'normal'}, {id:'C-30', temp:35, status:'warm'},
+  {id:'C-31', temp:30, status:'normal'}, {id:'C-32', temp:25, status:'normal'},
+];
+
+function buildHeatmap() {
+  const grid = document.getElementById('heatmapGrid');
+  grid.innerHTML = '';
+  cells.forEach(cell => {
+    const el = document.createElement('div');
+    el.className = 'heatmap-cell ' + cell.status + (cell.id === 'C-07' ? ' selected' : '');
+    el.innerHTML = `
+      <div class="cell-id">${cell.id}</div>
+      <div class="cell-temp">${cell.temp}°</div>
+      <div class="tooltip">
+        <div class="tooltip-row"><span>容器</span><span>${cell.id}</span></div>
+        <div class="tooltip-row"><span>溫度</span><span>${cell.temp}°C</span></div>
+        <div class="tooltip-row"><span>狀態</span><span>${{cool:'冷卻',normal:'正常',warm:'偏高',hot:'過熱',critical:'危急'}[cell.status]}</span></div>
+      </div>`;
+    el.onclick = () => {
+      if (cell.id === 'C-07') showContainerDetail('C-07');
+      else {
+        grid.querySelectorAll('.heatmap-cell').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+      }
+    };
+    grid.appendChild(el);
+  });
+}
+buildHeatmap();
+
+function refreshHeatmap() {
+  cells.forEach(c => {
+    if (c.id !== 'C-07') {
+      c.temp = Math.max(20, Math.min(48, c.temp + (Math.random()-0.5)*3));
+      c.temp = Math.round(c.temp);
+      if (c.temp < 25) c.status = 'cool';
+      else if (c.temp < 32) c.status = 'normal';
+      else if (c.temp < 38) c.status = 'warm';
+      else if (c.temp < 45) c.status = 'hot';
+      else c.status = 'critical';
+    }
+  });
+  buildHeatmap();
+}
+
+// ===== ALERTS =====
+const alerts = [
+  {sev:'critical', title:'C-07 排氣溫度超過危急閾值 (47.3°C)', meta:'2 分鐘前 · Zone A Rack 3-3', badge:'危急', container:'C-07'},
+  {sev:'critical', title:'C-21 風扇轉速異常偏低 (<2000 RPM)', meta:'8 分鐘前 · Zone B Rack 2-1', badge:'危急', container:'C-21'},
+  {sev:'warning', title:'C-10 GPU 溫度持續升高 (82°C)', meta:'15 分鐘前 · Zone A Rack 1-2', badge:'警告', container:'C-10'},
+  {sev:'warning', title:'C-16 冷卻水流量不足 (78%)', meta:'23 分鐘前 · Zone C Rack 4-1', badge:'警告', container:'C-16'},
+  {sev:'warning', title:'C-26 功耗接近上限 (94%)', meta:'31 分鐘前 · Zone A Rack 5-2', badge:'警告', container:'C-26'},
+  {sev:'info', title:'UPS 備援系統完成自動測試', meta:'45 分鐘前 · 電力機房', badge:'資訊', container:''},
+  {sev:'info', title:'冷卻塔 3 定期保養已完成', meta:'1 小時前 · 冷卻機房', badge:'資訊', container:''},
+];
+
+function buildAlerts() {
+  const list = document.getElementById('alertList');
+  list.innerHTML = '';
+  alerts.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'alert-item';
+    el.innerHTML = `
+      <div class="alert-severity ${a.sev}"></div>
+      <div class="alert-content">
+        <div class="alert-title">${a.title}</div>
+        <div class="alert-meta">${a.meta}</div>
+      </div>
+      <span class="alert-badge ${a.sev}">${a.badge}</span>
+      ${a.container ? `<button class="alert-action-btn" onclick="event.stopPropagation();showContainerDetail('${a.container}')">處置 →</button>` : ''}`;
+    if (a.container === 'C-07') el.onclick = () => showContainerDetail('C-07');
+    list.appendChild(el);
+  });
+}
+buildAlerts();
+
+// ===== CONTAINER GRID =====
+function buildContainerGrid() {
+  const grid = document.getElementById('containerGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const statusLabel = {cool:'冷卻',normal:'正常',warm:'偏高',hot:'過熱',critical:'危急'};
+  const statusColor = {cool:'var(--accent-cyan)',normal:'var(--accent-green)',warm:'var(--accent-yellow)',hot:'var(--accent-orange)',critical:'var(--accent-red)'};
+  const powerMap = {'C-07':12.4,'C-10':11.8,'C-16':10.2,'C-21':9.6,'C-26':13.1};
+  cells.forEach(cell => {
+    const isCrit = cell.id === 'C-07';
+    const power = powerMap[cell.id] || (7 + Math.random()*5).toFixed(1);
+    const el = document.createElement('div');
+    el.className = 'container-card' + (isCrit ? ' critical-card' : '');
+    el.innerHTML = `
+      <div class="container-card-id">${cell.id}</div>
+      <div class="container-card-temp" style="color:${statusColor[cell.status]}">${cell.temp}°C</div>
+      <div class="container-card-footer">
+        <span class="status-badge ${cell.status === 'critical' ? 'err' : cell.status === 'hot' || cell.status === 'warm' ? 'warn' : 'ok'}">${statusLabel[cell.status]}</span>
+        <span class="container-card-power">${power} kW</span>
+      </div>`;
+    el.onclick = () => showContainerDetail(cell.id);
+    grid.appendChild(el);
+  });
+}
+buildContainerGrid();
+
+// ===== TICKET TABLE =====
+const ticketsData = [
+  {id:'#WO-2026-0847', container:'C-07', desc:'高溫警告 - 冷卻系統風扇故障', assignee:'李明（冷卻系統）', status:'pending', time:'2026-03-26 14:35'},
+  {id:'#WO-2026-0831', container:'C-21', desc:'風扇轉速異常偏低 (<2000 RPM)', assignee:'張偉（硬體維護）', status:'inprogress', time:'2026-03-26 11:20'},
+  {id:'#WO-2026-0818', container:'C-10', desc:'GPU 溫度持續升高，超過建議值', assignee:'王芳（GPU 專員）', status:'inprogress', time:'2026-03-25 16:08'},
+  {id:'#WO-2026-0805', container:'C-16', desc:'冷卻水流量不足，效率降至 78%', assignee:'李明（冷卻系統）', status:'done', time:'2026-03-25 09:44'},
+  {id:'#WO-2026-0792', container:'C-26', desc:'功耗接近上限，建議負載調度', assignee:'陳建（電氣系統）', status:'done', time:'2026-03-24 14:12'},
+];
+
+let currentFilter = 'all';
+
+function renderTickets(filter) {
+  const tbody = document.getElementById('ticketTableBody');
+  if (!tbody) return;
+  const filtered = filter === 'all' ? ticketsData : ticketsData.filter(t => t.status === filter);
+  tbody.innerHTML = '';
+  filtered.forEach(t => {
+    const badgeClass = t.status === 'pending' ? 'badge-pending' : t.status === 'inprogress' ? 'badge-inprogress' : 'badge-done';
+    const badgeText = t.status === 'pending' ? '待處理' : t.status === 'inprogress' ? '處理中' : '已完成';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="ticket-id">${t.id}</span></td>
+      <td><span style="color:var(--accent-blue);font-weight:600">${t.container}</span></td>
+      <td><div class="ticket-desc">${t.desc}</div></td>
+      <td style="color:var(--text-secondary)">${t.assignee}</td>
+      <td><span class="${badgeClass}">${badgeText}</span></td>
+      <td style="color:var(--text-muted);font-size:12px">${t.time}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+renderTickets('all');
+
+function filterTickets(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTickets(filter);
+}
+
+// ===== EVENTS =====
+const events = [
+  {time:'14:32', color:'red', msg:'排氣溫度超過危急閾值 47.3°C，自動告警觸發'},
+  {time:'14:28', color:'yellow', msg:'風扇 #3 轉速下降至 2100 RPM（正常 > 4000 RPM）'},
+  {time:'14:15', color:'yellow', msg:'GPU 溫度達 83°C，超過建議值 80°C'},
+  {time:'13:50', color:'blue', msg:'AI 訓練任務 job-4821 開始執行，GPU 負載 94%'},
+  {time:'12:30', color:'yellow', msg:'冷卻效率下降至 76%，系統發出預警'},
+  {time:'11:45', color:'blue', msg:'系統自動備份完成，資料已同步至 NAS'},
+  {time:'10:22', color:'green', msg:'定期健康檢查通過，所有指標正常'},
+  {time:'09:15', color:'blue', msg:'firmware 自動更新完成，版本 v2.4.1'},
+  {time:'08:00', color:'green', msg:'容器 C-07 啟動，系統初始化完成'},
+];
+
+function buildEvents() {
+  const list = document.getElementById('eventList');
+  if (!list) return;
+  list.innerHTML = '';
+  events.forEach(e => {
+    const el = document.createElement('div');
+    el.className = 'event-item';
+    el.innerHTML = `<span class="event-time">${e.time}</span><div class="event-dot ${e.color}"></div><span class="event-msg">${e.msg}</span>`;
+    list.appendChild(el);
+  });
+}
+buildEvents();
+
+// ===== CHART.JS HELPERS =====
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e2a42', borderColor: '#3a5080', borderWidth: 1, padding: 10 } },
+  scales: {
+    x: { grid: { color: 'rgba(42,58,92,0.5)' }, ticks: { color: '#4a5a78', font: { size: 10 } } },
+    y: { grid: { color: 'rgba(42,58,92,0.5)' }, ticks: { color: '#4a5a78', font: { size: 10 } } }
+  }
+};
+
+function genLabels(n, unit, offset) {
+  offset = offset || 0;
+  return Array.from({length:n}, function(_,i){ return ((i+offset) % 24) + unit; });
+}
+function genData(n, base, spread) {
+  return Array.from({length:n}, function(){ return base + (Math.random()-0.5)*spread; });
+}
+
+(function initOverviewCharts() {
+  const labels = genLabels(24, ':00');
+  new Chart(document.getElementById('networkChart'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { data: genData(24,120,60), borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', fill:true, tension:0.4, pointRadius:0, borderWidth:2 },
+      { data: genData(24,80,40), borderColor:'#06b6d4', backgroundColor:'rgba(6,182,212,0.05)', fill:true, tension:0.4, pointRadius:0, borderWidth:1.5, borderDash:[4,3] }
+    ]},
+    options: chartDefaults
+  });
+  new Chart(document.getElementById('powerChart'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { data: genData(24,4.8,0.4), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, pointRadius:0, borderWidth:2 }
+    ]},
+    options: chartDefaults
+  });
+  new Chart(document.getElementById('tempDistChart'), {
+    type: 'bar',
+    data: { labels: ['<25°','25-32°','32-38°','38-45°','>45°'], datasets: [
+      { data:[3,14,9,4,2], backgroundColor:['#06b6d4','#10b981','#f59e0b','#f97316','#ef4444'], borderRadius:4, borderWidth:0 }
+    ]},
+    options: {...chartDefaults, scales: {
+      x: { grid:{display:false}, ticks:{color:'#4a5a78',font:{size:10}} },
+      y: { grid:{color:'rgba(42,58,92,0.5)'}, ticks:{color:'#4a5a78',font:{size:10},stepSize:5} }
+    }}
+  });
+})();
+
+// ===== DETAIL CHARTS =====
+function initDetailCharts() {
+  const tempLabels = genLabels(25, ':00');
+  const tempBase = [28,27,26,27,28,29,30,31,32,34,35,36,37,38,39,40,41,42,43,44,45,46,47,47,47];
+  new Chart(document.getElementById('tempTrendChart'), {
+    type: 'line',
+    data: { labels: tempLabels, datasets: [
+      { label:'排氣溫度', data: tempBase.map(v => v+(Math.random()-0.5)*1.5), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.15)', fill:true, tension:0.4, pointRadius:2, borderWidth:2, pointBackgroundColor:'#ef4444' },
+      { label:'進氣溫度', data: Array.from({length:25},(_,i)=>22+Math.sin(i*0.3)*2), borderColor:'#06b6d4', backgroundColor:'rgba(6,182,212,0.05)', fill:false, tension:0.4, pointRadius:0, borderWidth:1.5, borderDash:[5,4] },
+      { label:'危急閾值', data: new Array(25).fill(45), borderColor:'rgba(239,68,68,0.5)', borderWidth:1, borderDash:[6,3], pointRadius:0, fill:false }
+    ]},
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display:true, labels:{color:'#8a9bb8',font:{size:11},boxWidth:20,padding:16} } } }
+  });
+  new Chart(document.getElementById('gpuChart'), {
+    type: 'line',
+    data: { labels: genLabels(24,':00'), datasets: [
+      { data: Array.from({length:24},(_,i)=>60+i*1.5+(Math.random()-0.5)*5), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.15)', fill:true, tension:0.4, pointRadius:0, borderWidth:2 }
+    ]},
+    options: chartDefaults
+  });
+  new Chart(document.getElementById('memChart'), {
+    type: 'line',
+    data: { labels: genLabels(24,':00'), datasets: [
+      { data: genData(24,80,12), borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.15)', fill:true, tension:0.4, pointRadius:0, borderWidth:2 }
+    ]},
+    options: chartDefaults
+  });
+}
+
+// ===== MODAL =====
+let selectedPriority = 'critical';
+
+function openModal() {
+  document.getElementById('modalFormView').style.display = 'block';
+  document.getElementById('modalSuccessView').classList.remove('active');
+  const d = new Date(); d.setHours(d.getHours() + 2);
+  document.getElementById('dueDate').value = d.toISOString().slice(0,16);
+  document.getElementById('workorderModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('workorderModal').classList.remove('active');
+  setTimeout(function() {
+    document.getElementById('modalFormView').style.display = 'block';
+    document.getElementById('modalSuccessView').classList.remove('active');
+    selectedPriority = 'critical';
+    updatePriorityUI();
+  }, 300);
+}
+
+function selectPriority(p) {
+  selectedPriority = p;
+  updatePriorityUI();
+}
+
+function updatePriorityUI() {
+  document.querySelectorAll('.priority-btn').forEach(function(b){ b.className = 'priority-btn'; });
+  const map = {low:'selected-low', medium:'selected-medium', high:'selected-high', critical:'selected-critical'};
+  const idx = {low:0, medium:1, high:2, critical:3}[selectedPriority];
+  document.querySelectorAll('.priority-btn')[idx].className = 'priority-btn ' + map[selectedPriority];
+}
+
+function submitTicket() {
+  const assigneeEl = document.getElementById('assignee');
+  const assigneeName = assigneeEl.options[assigneeEl.selectedIndex].text;
+  const due = document.getElementById('dueDate').value;
+  const num = '#WO-2026-' + (Math.floor(Math.random()*900)+100);
+  document.getElementById('ticketNum').textContent = num;
+  document.getElementById('assigneeName').textContent = assigneeName;
+  document.getElementById('dueDateDisplay').textContent = due ? new Date(due).toLocaleString('zh-TW') : '—';
+  document.getElementById('modalFormView').style.display = 'none';
+  document.getElementById('modalSuccessView').classList.add('active');
+}
+
+document.getElementById('workorderModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+updatePriorityUI();
+
+// ===== POWER PAGE =====
+function openRebalanceModal() {
+  document.getElementById('rebalanceModal').classList.add('active');
+}
+function closeRebalanceModal() {
+  document.getElementById('rebalanceModal').classList.remove('active');
+}
+function confirmRebalance() {
+  closeRebalanceModal();
+  document.getElementById('circuitB-bar').style.width = '71%';
+  document.getElementById('circuitB-bar').style.background = 'var(--accent-green)';
+  document.getElementById('circuitB-bar').style.animation = 'none';
+  document.getElementById('circuitB-bar').textContent = '3.41 MW';
+  document.getElementById('circuitB-pct').textContent = '71%';
+  document.getElementById('circuitB-pct').style.color = 'var(--accent-green)';
+  document.getElementById('circuitB-badge').className = 'status-badge ok';
+  document.getElementById('circuitB-badge').textContent = '正常';
+  document.getElementById('circuitC-bar').style.width = '74%';
+  document.getElementById('circuitC-bar').textContent = '3.55 MW';
+  document.getElementById('circuitC-pct').textContent = '74%';
+  document.getElementById('ai-suggestion-card').style.display = 'none';
+  showToast('✓ 負載重新平衡已執行，迴路 B 恢復正常');
+}
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(function(){ t.style.display = 'none'; }, 3000);
+}
+
+// ===== ENV PAGE =====
+function openEnvDrawer() {
+  document.getElementById('envDrawer').style.display = 'block';
+  document.getElementById('envDrawerOverlay').style.display = 'block';
+}
+function closeEnvDrawer() {
+  document.getElementById('envDrawer').style.display = 'none';
+  document.getElementById('envDrawerOverlay').style.display = 'none';
+}
+function saveEnvThreshold() {
+  const val = document.getElementById('humiditySlider').value;
+  closeEnvDrawer();
+  showToast('✓ B 區濕度閾值已更新為 ' + val + '%');
+}
+// ===== AIOPS PAGE =====
+function openAiopsModal(device, riskType, suggestion) {
+  document.getElementById('aiops-device').textContent = device;
+  document.getElementById('aiops-risk').textContent = riskType;
+  document.getElementById('aiops-suggestion').textContent = suggestion;
+  document.getElementById('aiopsModalForm').style.display = 'block';
+  document.getElementById('aiopsModalSuccess').style.display = 'none';
+  document.getElementById('aiopsModal').classList.add('active');
+  document.querySelectorAll('.schedule-btn').forEach(function(b){ b.classList.remove('selected-high'); });
+  document.querySelectorAll('.schedule-btn')[0].classList.add('selected-high');
+}
+function closeAiopsModal() {
+  document.getElementById('aiopsModal').classList.remove('active');
+}
+function confirmAiopsSchedule() {
+  const assignee = document.getElementById('aiopsAssignee');
+  const name = assignee.options[assignee.selectedIndex].text;
+  const schedulebtns = document.querySelectorAll('.schedule-btn');
+  let scheduleTime = '今天下午';
+  schedulebtns.forEach(function(b){ if(b.classList.contains('selected-high')) scheduleTime = b.textContent; });
+  document.getElementById('aiops-result-device').textContent = document.getElementById('aiops-device').textContent;
+  document.getElementById('aiops-result-time').textContent = scheduleTime;
+  document.getElementById('aiops-result-assignee').textContent = name;
+  document.getElementById('aiops-result-num').textContent = '#PM-2026-' + (Math.floor(Math.random()*900)+100);
+  document.getElementById('aiopsModalForm').style.display = 'none';
+  document.getElementById('aiopsModalSuccess').style.display = 'block';
+}
+function selectSchedule(el) {
+  document.querySelectorAll('.schedule-btn').forEach(function(b){ b.classList.remove('selected-high'); });
+  el.classList.add('selected-high');
+}
+// ===== LIVE UPDATE =====
+setInterval(function() {
+  const c7 = cells.find(function(c){ return c.id === 'C-07'; });
+  if (c7) {
+    c7.temp = Math.max(45, Math.min(50, c7.temp + (Math.random()-0.3)*0.5));
+    c7.temp = Math.round(c7.temp * 10) / 10;
+  }
+}, 5000);
+</script>
+<div class="page" id="page-power">
+  <div class="section-header">
+    <div class="section-title">⚡ 電力監控</div>
+    <span style="font-size:12px;color:var(--text-muted)">即時更新中</span>
+  </div>
+
+  <!-- 迴路負載 -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title"><div class="dot" style="background:var(--accent-blue)"></div>迴路負載監控</div>
+    <div style="display:flex;flex-direction:column;gap:16px;margin-top:8px">
+
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="width:80px;font-size:13px;color:var(--text-secondary)">迴路 A</div>
+        <div style="flex:1;height:28px;background:var(--bg-secondary);border-radius:6px;overflow:hidden">
+          <div style="width:72%;height:100%;background:var(--accent-green);border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:600;color:#fff;transition:width 1s ease">3.46 MW</div>
+        </div>
+        <div style="width:50px;font-size:13px;font-weight:600;color:var(--accent-green)">72%</div>
+        <span class="status-badge ok">正常</span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="width:80px;font-size:13px;color:var(--text-secondary)">迴路 B</div>
+        <div style="flex:1;height:28px;background:var(--bg-secondary);border-radius:6px;overflow:hidden">
+          <div id="circuitB-bar" style="width:89%;height:100%;background:var(--accent-red);border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:600;color:#fff;transition:width 1s ease;animation:blink 1.5s infinite">4.27 MW</div>
+        </div>
+        <div id="circuitB-pct" style="width:50px;font-size:13px;font-weight:600;color:var(--accent-red)">89%</div>
+        <span id="circuitB-badge" class="status-badge err">警示</span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="width:80px;font-size:13px;color:var(--text-secondary)">迴路 C</div>
+        <div style="flex:1;height:28px;background:var(--bg-secondary);border-radius:6px;overflow:hidden">
+          <div id="circuitC-bar" style="width:61%;height:100%;background:var(--accent-green);border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:600;color:#fff;transition:width 1s ease">2.93 MW</div>
+        </div>
+        <div id="circuitC-pct" style="width:50px;font-size:13px;font-weight:600;color:var(--accent-green)">61%</div>
+        <span class="status-badge ok">正常</span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="width:80px;font-size:13px;color:var(--text-secondary)">迴路 D</div>
+        <div style="flex:1;height:28px;background:var(--bg-secondary);border-radius:6px;overflow:hidden">
+          <div style="width:55%;height:100%;background:var(--accent-green);border-radius:6px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:600;color:#fff;transition:width 1s ease">2.64 MW</div>
+        </div>
+        <div style="width:50px;font-size:13px;font-weight:600;color:var(--accent-green)">55%</div>
+        <span class="status-badge ok">正常</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- AI 建議卡片 -->
+  <div id="ai-suggestion-card" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:18px;margin-bottom:20px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--accent-blue);margin-bottom:8px">🤖 AI 建議：負載重新平衡</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+          偵測到迴路 B 負載達 <strong style="color:var(--accent-red)">89%</strong>，接近上限。建議將 C-07、C-12 移至迴路 C。<br>
+          執行後預測：迴路 B → <strong style="color:var(--accent-green)">71%</strong>，迴路 C → <strong style="color:var(--accent-yellow)">74%</strong>，整體更均衡。
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="btn btn-outline" style="font-size:12px">查看詳情</button>
+        <button class="btn btn-primary" style="font-size:12px" onclick="openRebalanceModal()">確認執行 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 容器用電明細 -->
+  <div class="card">
+    <div class="card-title"><div class="dot" style="background:var(--accent-purple)"></div>容器用電明細</div>
+    <table class="equip-table" style="margin-top:8px">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;padding-bottom:8px">容器</td>
+          <td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;padding-bottom:8px">所屬迴路</td>
+          <td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;padding-bottom:8px">功耗</td>
+          <td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;padding-bottom:8px">佔比</td>
+          <td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;padding-bottom:8px">狀態</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:rgba(249,115,22,0.06)"><td style="color:var(--accent-orange)">C-07</td><td>迴路 B</td><td>12.4 kW</td><td>2.9%</td><td><span class="status-badge warn">待移轉</span></td></tr>
+        <tr style="background:rgba(249,115,22,0.06)"><td style="color:var(--accent-orange)">C-12</td><td>迴路 B</td><td>10.8 kW</td><td>2.5%</td><td><span class="status-badge warn">待移轉</span></td></tr>
+        <tr><td>C-01</td><td>迴路 A</td><td>8.2 kW</td><td>1.9%</td><td><span class="status-badge ok">正常</span></td></tr>
+        <tr><td>C-02</td><td>迴路 A</td><td>9.1 kW</td><td>2.1%</td><td><span class="status-badge ok">正常</span></td></tr>
+        <tr><td>C-03</td><td>迴路 B</td><td>11.3 kW</td><td>2.6%</td><td><span class="status-badge ok">正常</span></td></tr>
+        <tr><td>C-04</td><td>迴路 C</td><td>7.9 kW</td><td>1.8%</td><td><span class="status-badge ok">正常</span></td></tr>
+        <tr><td>C-05</td><td>迴路 C</td><td>8.6 kW</td><td>2.0%</td><td><span class="status-badge ok">正常</span></td></tr>
+        <tr><td>C-06</td><td>迴路 D</td><td>9.4 kW</td><td>2.2%</td><td><span class="status-badge ok">正常</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<!-- TOAST -->
+<div id="toast" style="position:fixed;top:70px;right:24px;z-index:9999;display:none;background:#1a2235;border:1px solid var(--accent-green);border-radius:8px;padding:10px 16px;font-size:13px;color:var(--accent-green)"></div>
+
+<!-- REBALANCE MODAL -->
+<div class="modal-overlay" id="rebalanceModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">⚡ 確認負載重新平衡</div>
+      <button class="modal-close" onclick="closeRebalanceModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div style="background:var(--bg-card);border-radius:8px;padding:14px">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase">執行前</div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--text-secondary)">迴路 B</span><span style="color:var(--accent-red);font-weight:600">89%</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px"><span style="color:var(--text-secondary)">迴路 C</span><span style="font-weight:600">61%</span></div>
+        </div>
+        <div style="background:var(--bg-card);border-radius:8px;padding:14px">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase">執行後（預測）</div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--text-secondary)">迴路 B</span><span style="color:var(--accent-green);font-weight:600">71%</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px"><span style="color:var(--text-secondary)">迴路 C</span><span style="color:var(--accent-yellow);font-weight:600">74%</span></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);background:var(--bg-card);border-radius:8px;padding:10px 14px">
+        將 C-07、C-12 從迴路 B 移至迴路 C，操作不影響容器運行。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeRebalanceModal()">取消</button>
+      <button class="btn btn-primary" onclick="confirmRebalance()">確認執行</button>
+    </div>
+  </div>
+</div>
+<!-- AIOPS MODAL -->
+<div class="modal-overlay" id="aiopsModal">
+  <div class="modal" style="max-width:480px">
+    <div id="aiopsModalForm">
+      <div class="modal-header">
+        <div class="modal-title">📅 建立預防性維護排程</div>
+        <button class="modal-close" onclick="closeAiopsModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-secondary)">
+          🤖 以下資訊由 AI 診斷系統自動帶入
+        </div>
+        <div class="form-info-row" style="margin-bottom:16px">
+          <div class="info-box"><div class="info-box-label">設備</div><div class="info-box-value" style="color:var(--accent-blue)" id="aiops-device">—</div></div>
+          <div class="info-box"><div class="info-box-label">風險類型</div><div class="info-box-value" style="color:var(--accent-red)" id="aiops-risk">—</div></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">AI 建議處置方式</label>
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-secondary)" id="aiops-suggestion">—</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">排程時間</label>
+          <div style="display:flex;gap:8px">
+            <button class="priority-btn schedule-btn" onclick="selectSchedule(this)">今天下午</button>
+            <button class="priority-btn schedule-btn" onclick="selectSchedule(this)">明天上午</button>
+            <button class="priority-btn schedule-btn" onclick="selectSchedule(this)">本週內</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">指派人員</label>
+          <select class="form-select" id="aiopsAssignee">
+            <option>張偉（硬體維護）</option>
+            <option>李明（冷卻系統）</option>
+            <option>王芳（GPU 專員）</option>
+            <option>陳建（電氣系統）</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAiopsModal()">取消</button>
+        <button class="btn btn-primary" onclick="confirmAiopsSchedule()">確認排程 →</button>
+      </div>
+    </div>
+    <div id="aiopsModalSuccess" style="display:none">
+      <div class="success-screen active">
+        <div class="success-icon">✓</div>
+        <div class="success-title">預防排程已建立！</div>
+        <div class="success-sub">系統已通知指派工程師，排程已加入維護計畫</div>
+        <div class="success-ticket">
+          <div class="success-ticket-row"><span>排程編號</span><span style="color:var(--accent-blue);font-weight:600" id="aiops-result-num">—</span></div>
+          <div class="success-ticket-row"><span>設備</span><span id="aiops-result-device">—</span></div>
+          <div class="success-ticket-row"><span>排程時間</span><span id="aiops-result-time">—</span></div>
+          <div class="success-ticket-row"><span>指派人員</span><span id="aiops-result-assignee">—</span></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-outline" onclick="closeAiopsModal()">關閉</button>
+          <button class="btn btn-primary" onclick="closeAiopsModal();showPage('aiops')">返回 AIOps 頁面</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page" id="page-env">
+  <div class="section-header">
+    <div class="section-title">🌡️ 環境監控</div>
+    <span style="font-size:12px;color:var(--text-muted)">即時更新中</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- 左側：機房平面圖 -->
+    <div class="card">
+      <div class="card-title"><div class="dot" style="background:var(--accent-cyan)"></div>機房平面示意圖</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;height:280px;margin-top:8px">
+
+        <div onclick="openEnvDrawer()" style="background:rgba(16,185,129,0.15);border:2px solid rgba(16,185,129,0.4);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;grid-column:1;grid-row:1">
+          <div style="font-size:15px;font-weight:700;color:var(--accent-green)">A 區</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">溫度 22°C</div>
+          <div style="font-size:11px;color:var(--text-secondary)">濕度 45%</div>
+          <span class="status-badge ok" style="margin-top:8px">正常</span>
+        </div>
+
+        <div onclick="openEnvDrawer()" style="background:rgba(249,115,22,0.2);border:2px solid rgba(249,115,22,0.6);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;animation:blink 2s infinite;grid-column:2;grid-row:1">
+          <div style="font-size:15px;font-weight:700;color:var(--accent-orange)">B 區</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">溫度 24°C</div>
+          <div style="font-size:11px;color:var(--accent-red);font-weight:600">濕度 75% ⚠</div>
+          <span class="status-badge err" style="margin-top:8px">警示</span>
+        </div>
+
+        <div onclick="openEnvDrawer()" style="background:rgba(16,185,129,0.15);border:2px solid rgba(16,185,129,0.4);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;grid-column:1;grid-row:2">
+          <div style="font-size:15px;font-weight:700;color:var(--accent-green)">C 區</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">溫度 23°C</div>
+          <div style="font-size:11px;color:var(--text-secondary)">濕度 48%</div>
+          <span class="status-badge ok" style="margin-top:8px">正常</span>
+        </div>
+
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;grid-column:2;grid-row:2">
+          <div style="font-size:11px;color:var(--text-muted)">冷卻機房</div>
+          <div style="font-size:11px;color:var(--accent-cyan);margin-top:4px">液冷系統</div>
+          <span class="status-badge ok" style="margin-top:8px">運行中</span>
+        </div>
+
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:12px">點擊區域查看詳細感測器資訊</div>
+    </div>
+
+    <!-- 右側：感測器列表 -->
+    <div class="card">
+      <div class="card-title"><div class="dot" style="background:var(--accent-yellow)"></div>感測器狀態</div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">溫度感測器</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px;color:var(--text-secondary)">A 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-green)">22°C</span><span class="status-badge ok">正常</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px;color:var(--text-secondary)">B 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-yellow)">24°C</span><span class="status-badge ok">正常</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px;color:var(--text-secondary)">C 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-green)">23°C</span><span class="status-badge ok">正常</span></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">濕度感測器</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px;color:var(--text-secondary)">A 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-green)">45%</span><span class="status-badge ok">正常</span></div>
+          <div onclick="openEnvDrawer()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer"><span style="font-size:13px;color:var(--text-secondary)">B 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-red)">75% ⚠</span><span class="status-badge err">警示</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px;color:var(--text-secondary)">C 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-green)">48%</span><span class="status-badge ok">正常</span></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">漏水感測器</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px;color:var(--text-secondary)">A / B / C 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-green)">無異常</span><span class="status-badge ok">正常</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">煙霧感測器</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg-secondary);border-radius:6px"><span style="font-size:13px;color:var(--text-secondary)">A / B / C 區</span><span style="font-size:13px;font-weight:600;color:var(--accent-green)">無異常</span><span class="status-badge ok">正常</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  
+
+</div>
+<div class="page" id="page-aiops">
+  <div class="section-header">
+    <div class="section-title">🤖 AIOps 預測性維護</div>
+    <span style="font-size:12px;color:var(--text-muted)">模型更新於 02:00</span>
+  </div>
+
+  <!-- 頂部橫幅 -->
+  <div style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+    <span style="font-size:20px">🤖</span>
+    <div>
+      <div style="font-size:14px;font-weight:600;color:#a78bfa">AI 系統偵測到 3 個潛在風險</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">建議在 48 小時內預防處置，避免非計畫性停機</div>
+    </div>
+  </div>
+
+  <!-- 風險卡片 -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+
+    <!-- 卡片 1：高風險 -->
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex">
+      <div style="width:4px;background:var(--accent-red);flex-shrink:0"></div>
+      <div style="padding:16px 18px;flex:1;display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="font-size:14px;font-weight:600">容器 C-07｜散熱片效能持續下降</span>
+            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--glow-red);color:var(--accent-red);border:1px solid rgba(239,68,68,0.3)">高風險</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">⏱ 預測：<strong style="color:var(--accent-red)">24H 內</strong>可能超過安全閾值</div>
+          <div style="font-size:12px;color:var(--text-muted);background:var(--bg-secondary);border-radius:6px;padding:8px 10px;line-height:1.6">
+            AI 依據：效能連續 3 天下降趨勢，距上次保養 89 天，導熱膏老化機率 <strong style="color:var(--accent-red)">87%</strong>
+          </div>
+        </div>
+        <button class="btn btn-danger" style="white-space:nowrap;flex-shrink:0" onclick="openAiopsModal('C-07','散熱片效能下降','更換導熱膏，檢查散熱片安裝狀態')">建立預防排程 →</button>
+      </div>
+    </div>
+
+    <!-- 卡片 2：中風險 -->
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex">
+      <div style="width:4px;background:var(--accent-orange);flex-shrink:0"></div>
+      <div style="padding:16px 18px;flex:1;display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="font-size:14px;font-weight:600">容器 C-19｜液冷進水溫度偏高趨勢</span>
+            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(249,115,22,0.1);color:var(--accent-orange);border:1px solid rgba(249,115,22,0.3)">中風險</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">⏱ 預測：<strong style="color:var(--accent-orange)">48H 內</strong>可能影響散熱效率</div>
+          <div style="font-size:12px;color:var(--text-muted);background:var(--bg-secondary);border-radius:6px;padding:8px 10px;line-height:1.6">
+            AI 依據：進水溫度連續上升 12 小時，目前 28°C 超過建議值 26°C，冷卻塔效率下降 <strong style="color:var(--accent-orange)">12%</strong>
+          </div>
+        </div>
+        <button class="btn btn-outline" style="white-space:nowrap;flex-shrink:0;color:var(--accent-orange);border-color:rgba(249,115,22,0.4)" onclick="openAiopsModal('C-19','液冷進水溫度偏高','檢查冷卻塔狀態，清洗過濾網')">建立預防排程 →</button>
+      </div>
+    </div>
+
+    <!-- 卡片 3：低風險 -->
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex">
+      <div style="width:4px;background:var(--accent-yellow);flex-shrink:0"></div>
+      <div style="padding:16px 18px;flex:1;display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="font-size:14px;font-weight:600">迴路 B｜負載持續成長趨勢</span>
+            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,0.1);color:var(--accent-yellow);border:1px solid rgba(245,158,11,0.3)">低風險</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">⏱ 預測：<strong style="color:var(--accent-yellow)">72H 內</strong>若工作負載持續增加可能達 90%</div>
+          <div style="font-size:12px;color:var(--text-muted);background:var(--bg-secondary);border-radius:6px;padding:8px 10px;line-height:1.6">
+            AI 依據：過去 7 天每日平均增長 1.2%，當前 89%，建議提前規劃負載平衡
+          </div>
+        </div>
+        <button class="btn btn-outline" style="white-space:nowrap;flex-shrink:0;color:var(--accent-yellow);border-color:rgba(245,158,11,0.4)" onclick="openAiopsModal('迴路 B','負載成長趨勢','執行負載重新平衡，評估擴容需求')">建立預防排程 →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- Drawer 遮罩 -->
+  <div id="envDrawerOverlay" onclick="closeEnvDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500"></div>
+
+  <!-- Drawer -->
+  <div id="envDrawer" style="display:none;position:fixed;top:0;right:0;width:360px;height:100vh;background:var(--bg-secondary);border-left:1px solid var(--border-bright);z-index:501;padding:24px;overflow-y:auto;animation:slideIn 0.25s ease">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="font-size:16px;font-weight:600;color:var(--accent-orange)">⚠ B 區濕度異常</div>
+      <button onclick="closeEnvDrawer()" class="modal-close">×</button>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">受影響容器</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:8px"><span style="font-size:13px">C-09</span><span class="status-badge warn">需關注</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:8px"><span style="font-size:13px">C-10</span><span class="status-badge warn">需關注</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:8px"><span style="font-size:13px">C-11</span><span class="status-badge warn">需關注</span></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">閾值設定</div>
+      <div style="background:var(--bg-card);border-radius:8px;padding:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;color:var(--text-secondary)">當前濕度</span>
+          <span style="font-size:13px;font-weight:600;color:var(--accent-red)">75%（超標）</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:16px">
+          <span style="font-size:13px;color:var(--text-secondary)">告警上限</span>
+          <span style="font-size:13px;font-weight:600;color:var(--accent-yellow)" id="thresholdDisplay">70%</span>
+        </div>
+        <input type="range" min="60" max="90" value="70" id="humiditySlider"
+          oninput="document.getElementById('thresholdDisplay').textContent=this.value+'%'"
+          style="width:100%;accent-color:var(--accent-blue);margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+          <span>60%</span><span>90%</span>
+        </div>
+      </div>
+    </div>
+
+    <button onclick="saveEnvThreshold()" class="btn btn-primary" style="width:100%;justify-content:center">儲存設定</button>
+  </div>
+</body>
+</html>
